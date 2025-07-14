@@ -1,0 +1,48 @@
+# Node dependencies
+node_modules/
+
+# Expo and build
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+.env.local
+.env*.local
+
+# Cursor IDE config
+.cursor/
+
+# macOS system files
+.DS_Store
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Metro bundler
+.metro-health-check*
+
+# Android / iOS / mobile
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Kotlin (if applicable)
+.kotlin/
+*.orig.*
+
+# VSCode / Cursor settings
+.vscode/
+
+# Others
+app-example/
