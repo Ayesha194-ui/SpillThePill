@@ -3,7 +3,6 @@ import {
     autocompleteDrug,
     getDrugInfo,
     // getMedlinePlusInfo,
-    getRxCui,
     simplifyDrugInfoController
 } from "../controllers/drugController";
 import { getRawDrugData } from "../services/dbApi";
@@ -13,7 +12,7 @@ const router = express.Router();
 router.get("/", (req, res) => {
   res.status(200).json({ message: "Welcome to the Drugs API!" });
 });
-router.get("/rxcui", getRxCui);
+// RxCUI route removed - no longer needed
 router.get("/info/:rxcui", getDrugInfo);
 router.get("/autocomplete", autocompleteDrug);
 // // router.get("/medlineplus/:rxcui", getMedlinePlusInfo);

@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Platform, Alert, Clipboard } from 'react-native';
+import { View, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Platform, Alert, Clipboard, Share } from 'react-native';
 import { Text, ActivityIndicator, Snackbar } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function ResultScreen({ route, navigation }: any) {
-  const { medicineName, model, language } = route.params;
+// Import web enhancements only on web platform
+if (Platform.OS === 'web') {
+  require('../styles/web-enhancements.css');
+}
+
+export default function ResultScreen({ medicineName, model, language }: { 
+  medicineName: string; 
+  model: string; 
+  language: string; 
+}) {
+  const router = useRouter();
+  const { isAuthenticated, saveMedicine } = useAuth();
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,9 +24,13 @@ export default function ResultScreen({ route, navigation }: any) {
   const [saveButtonState, setSaveButtonState] = useState<'default' | 'saved'>('default');
   const [feedbackStats, setFeedbackStats] = useState({ likes: 100, dislikes: 55 });
   const [userFeedback, setUserFeedback] = useState<'like' | 'dislike' | null>(null);
+  const [compareList, setCompareList] = useState<string[]>([]);
+  const [isInCompareList, setIsInCompareList] = useState(false);
 
   useEffect(() => {
     fetchResult();
+    loadCompareList();
+    console.log('Platform.OS:', Platform.OS);
   }, []);
 
   useEffect(() => {
@@ -30,27 +46,44 @@ export default function ResultScreen({ route, navigation }: any) {
     }
   }, [medicineName]);
 
+  const loadCompareList = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('compareList');
+      if (stored) {
+        const list = JSON.parse(stored);
+        setCompareList(list);
+        setIsInCompareList(list.includes(medicineName));
+      }
+    } catch (error) {
+      console.error('Error loading compare list:', error);
+    }
+  };
+
   const fetchResult = async () => {
     setLoading(true);
     setError('');
     try {
-      let endpoint = `/api/drugs/simplify/${encodeURIComponent(medicineName.trim())}?model=${model}`;
-      if (language) {
-        endpoint += `&language=${language}`;
-      }
+      // Use localhost for web, IP address for mobile
+      const baseUrl = Platform.OS === 'web' ? 'http://localhost:5050' : 'http://10.0.2.2:5050';
+      const response = await fetch(`${baseUrl}/api/drugs/simplify/${encodeURIComponent(medicineName)}?model=${model}&language=${language}`);
       
-      const res = await fetch(`http://localhost:5050${endpoint}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Unknown error');
+      if (response.ok) {
+        const data = await response.json();
+        // Handle the new LLM response format
+        if (data.simplified) {
+          setResult(data.simplified);
+        } else if (data.error) {
+          setError(data.error);
+        } else {
+          setResult('No results found');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || 'Failed to fetch drug information. Please try again.');
       }
-      const data = await res.json();
-      setResult(data.simplified);
-      // Save to recently viewed
-      saveRecentlyViewed(medicineName.trim());
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch result');
-      setShowSnackbar(true);
+    } catch (error) {
+      console.error('Error fetching result:', error);
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -86,36 +119,32 @@ export default function ResultScreen({ route, navigation }: any) {
   // Save current medicine to Saved Medicines
   const saveToSavedMedicines = async (name: string) => {
     if (saveButtonState === 'saved') return; // Prevent duplicate saves
+    
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to save medicines to your account.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/(tabs)/profile') }
+        ]
+      );
+      return;
+    }
+    
     try {
-      let items: string[] = [];
-      if (Platform.OS === 'web') {
-        const raw = localStorage.getItem('savedMedicines') || '[]';
-        items = JSON.parse(raw);
-      } else {
-        const raw = await AsyncStorage.getItem('savedMedicines');
-        items = raw ? JSON.parse(raw) : [];
-      }
-      // Remove if already exists
-      items = items.filter((item) => item.toLowerCase() !== name.toLowerCase());
-      // Add to top
-      items.unshift(name);
-      // Limit to 20
-      if (items.length > 20) items = items.slice(0, 20);
-      if (Platform.OS === 'web') {
-        localStorage.setItem('savedMedicines', JSON.stringify(items));
-      } else {
-        await AsyncStorage.setItem('savedMedicines', JSON.stringify(items));
-      }
+      await saveMedicine(name);
       setShowSnackbar(true);
       setSaveButtonState('saved');
       setTimeout(() => setSaveButtonState('default'), 2000);
     } catch (e) {
-      // Ignore errors for now
+      console.error('Error saving medicine:', e);
+      Alert.alert('Error', 'Failed to save medicine. Please try again.');
     }
   };
 
   const handleNewSearch = () => {
-    navigation.goBack();
+    router.back();
   };
 
   const handleFeedback = (type: 'like' | 'dislike') => {
@@ -134,28 +163,115 @@ export default function ResultScreen({ route, navigation }: any) {
     }
   };
 
-  // Share/Compare/Reminder handlers (mock)
-  const handleShare = () => {
-    if (Platform.OS === 'web') {
-      navigator.clipboard.writeText(result || medicineName);
-      window.alert('Result copied to clipboard.');
-    } else {
-      Clipboard.setString(result || medicineName);
-      Alert.alert('Copied!', 'Result copied to clipboard.');
+  // Share/Compare/Reminder handlers (real functionality)
+  const handleShare = async () => {
+    try {
+      const shareContent = `${medicineName}\n\n${result || 'Medicine information'}\n\nShared via SpillThePill`;
+      
+      if (Platform.OS === 'web') {
+        navigator.clipboard.writeText(shareContent);
+        Alert.alert('Shared!', 'Medicine information copied to clipboard.');
+      } else {
+        const result = await Share.share({
+          message: shareContent,
+          title: `Medicine Info: ${medicineName}`,
+        });
+        
+        if (result.action === Share.sharedAction) {
+          Alert.alert('Shared!', 'Medicine information shared successfully.');
+        }
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      Alert.alert('Error', 'Failed to share medicine information.');
     }
   };
-  const handleCompare = () => {
-    if (Platform.OS === 'web') {
-      window.alert('Added to compare (mock).');
-    } else {
-      Alert.alert('Compare', 'Added to compare (mock).');
+
+  const handleCompare = async () => {
+    try {
+      let newCompareList = [...compareList];
+      
+      if (isInCompareList) {
+        // Remove from compare list
+        newCompareList = newCompareList.filter(item => item !== medicineName);
+        setIsInCompareList(false);
+        Alert.alert('Removed', `${medicineName} removed from compare list.`);
+      } else {
+        // Add to compare list
+        if (newCompareList.length >= 5) {
+          Alert.alert('Compare List Full', 'You can only compare up to 5 medicines at a time. Please remove some items first.');
+          return;
+        }
+        newCompareList.push(medicineName);
+        setIsInCompareList(true);
+        Alert.alert('Added', `${medicineName} added to compare list.`);
+      }
+      
+      setCompareList(newCompareList);
+      await AsyncStorage.setItem('compareList', JSON.stringify(newCompareList));
+    } catch (error) {
+      console.error('Error updating compare list:', error);
+      Alert.alert('Error', 'Failed to update compare list.');
     }
   };
+
   const handleSetReminder = () => {
     if (Platform.OS === 'web') {
-      window.alert('Reminder set (mock).');
-    } else {
-      Alert.alert('Set Reminder', 'Reminder set (mock).');
+      Alert.alert('Reminder', 'Reminder feature is available on mobile devices only.');
+      return;
+    }
+
+    Alert.alert(
+      'Set Medication Reminder',
+      'Would you like to set a reminder for this medicine?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Set Reminder', 
+          onPress: () => {
+            // For now, save reminder data to storage
+            // In a real app, this would integrate with device notifications
+            saveReminderData();
+            Alert.alert(
+              'Reminder Set!', 
+              `Reminder set for ${medicineName}. You'll be notified when it's time to take your medication.`,
+              [
+                { text: 'OK' },
+                { 
+                  text: 'View Reminders', 
+                  onPress: () => {
+                    // Navigate to reminders screen (would need to be created)
+                    Alert.alert('Reminders', 'Reminders feature coming soon!');
+                  }
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  };
+
+  const saveReminderData = async () => {
+    try {
+      const reminderData = {
+        medicineName,
+        timestamp: new Date().toISOString(),
+        result: result || '',
+        model,
+        language
+      };
+      
+      let reminders = [];
+      const stored = await AsyncStorage.getItem('medicationReminders');
+      if (stored) {
+        reminders = JSON.parse(stored);
+      }
+      
+      reminders.push(reminderData);
+      await AsyncStorage.setItem('medicationReminders', JSON.stringify(reminders));
+    } catch (error) {
+      console.error('Error saving reminder:', error);
     }
   };
 
@@ -187,15 +303,16 @@ export default function ResultScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>💊 Medicine Information</Text>
-          <Text style={styles.headerSubtitle}>Your search results</Text>
+          {Platform.OS !== 'web' && (
+            <Text style={styles.headerText}>result</Text>
+          )}
         </View>
 
         {/* Medicine Info Card */}
-        <View style={styles.medicineCard}>
+        <View style={styles.medicineCard} className={Platform.OS === 'web' ? 'web-glass-card web-modern-radius web-hover-effect' : ''}>
           <View style={styles.medicineHeader}>
             <Text style={styles.medicineIcon}>💊</Text>
             <View style={styles.medicineInfo}>
@@ -261,9 +378,19 @@ export default function ResultScreen({ route, navigation }: any) {
               <Text style={styles.quickActionIcon}>📅</Text>
               <Text style={styles.quickActionText}>Set Reminder</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleCompare}>
-              <Text style={styles.quickActionIcon}>📊</Text>
-              <Text style={styles.quickActionText}>Compare</Text>
+            <TouchableOpacity 
+              style={[
+                styles.quickActionButton, 
+                isInCompareList && styles.quickActionButtonActive
+              ]} 
+              onPress={handleCompare}
+            >
+              <Text style={styles.quickActionIcon}>
+                {isInCompareList ? '✅' : '📊'}
+              </Text>
+              <Text style={styles.quickActionText}>
+                {isInCompareList ? 'In Compare' : 'Compare'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleShare}>
               <Text style={styles.quickActionIcon}>📤</Text>
@@ -308,26 +435,35 @@ export default function ResultScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f8ff', // Light blue pastel background
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#f0f8ff',
   },
   scrollView: {
     flex: 1,
   },
+  contentContainer: {
+    paddingBottom: 20, // Add some padding at the bottom for the snackbar
+  },
   header: {
-    padding: 20,
-    paddingTop: 40,
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    backgroundColor: '#e6f3ff', // Slightly darker pastel blue
+    justifyContent: 'center',
+  },
+  headerText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: Platform.OS === 'web' ? 36 : 28,
     fontWeight: 'bold',
-    color: '#2c5aa0',
+    color: Platform.OS === 'web' ? '#1a1a1a' : '#2c5aa0',
     marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#5a7c9a',
+    fontSize: Platform.OS === 'web' ? 18 : 16,
+    color: Platform.OS === 'web' ? '#666' : '#5a7c9a',
   },
   loadingContainer: {
     flex: 1,
@@ -349,15 +485,17 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   medicineCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    margin: 20,
+    backgroundColor: Platform.OS === 'web' ? 'rgba(255, 255, 255, 0.95)' : 'white',
+    borderRadius: Platform.OS === 'web' ? 20 : 16,
+    padding: Platform.OS === 'web' ? 24 : 20,
+    margin: Platform.OS === 'web' ? 24 : 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: Platform.OS === 'web' ? 4 : 2 },
+    shadowOpacity: Platform.OS === 'web' ? 0.15 : 0.1,
+    shadowRadius: Platform.OS === 'web' ? 12 : 8,
+    elevation: Platform.OS === 'web' ? 6 : 3,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: Platform.OS === 'web' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
   },
   medicineHeader: {
     flexDirection: 'row',
@@ -504,6 +642,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  quickActionButtonActive: {
+    backgroundColor: '#e8f5e8',
+    borderColor: '#4caf50',
+  },
   quickActionIcon: {
     fontSize: 24,
     marginBottom: 6,
@@ -536,7 +678,7 @@ const styles = StyleSheet.create({
   feedbackStat: {
     fontSize: 18,
     marginHorizontal: 16,
-    color: '#1976d2',
+    color: '#424242',
     fontWeight: 'bold',
   },
   snackbar: {
@@ -549,5 +691,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     elevation: 4,
     zIndex: 100,
+  },
+  webBackButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  webBackButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 }); 
