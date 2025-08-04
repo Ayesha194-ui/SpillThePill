@@ -1,0 +1,108 @@
+/* Web-specific enhancements for SpillThePill - Harmonious Color Palette */
+
+/* Background for web - Pastel Blue */
+.web-gradient-bg {
+  background: #E0F7FA;
+  min-height: 100vh;
+}
+
+/* Glass morphism effect for cards - Soft Baby Blue */
+.web-glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(179, 235, 242, 0.3);
+  box-shadow: 0 8px 32px rgba(179, 235, 242, 0.15);
+}
+
+/* Enhanced shadows for web - Soft Baby Blue tint */
+.web-enhanced-shadow {
+  box-shadow: 0 8px 32px rgba(179, 235, 242, 0.2);
+}
+
+/* Gradient button for web - Primary and Secondary Accents */
+.web-gradient-button {
+  background: linear-gradient(135deg, #FDC5DC 0%, #C8E6C9 100%);
+  border: 2px solid rgba(179, 235, 242, 0.4);
+  box-shadow: 0 6px 20px rgba(179, 235, 242, 0.3);
+}
+
+/* Hover effects for web - Soft Baby Blue accent */
+.web-hover-effect:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(179, 235, 242, 0.25);
+  transition: all 0.3s ease;
+}
+
+/* Smooth transitions */
+.web-smooth-transition {
+  transition: all 0.3s ease;
+}
+
+/* Text shadow for web - Soft Baby Blue tint */
+.web-text-shadow {
+  text-shadow: 0 2px 4px rgba(179, 235, 242, 0.2);
+}
+
+/* Modern border radius */
+.web-modern-radius {
+  border-radius: 20px;
+}
+
+/* Enhanced typography */
+.web-enhanced-typography {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+/* Bottom navigation for web - Soft Baby Blue tint */
+.web-bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-top: 1px solid rgba(179, 235, 242, 0.3) !important;
+  z-index: 1000 !important;
+}
+
+/* Top navigation for web - Soft Baby Blue tint */
+.web-top-nav {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(179, 235, 242, 0.3) !important;
+  z-index: 1000 !important;
+}
+
+/* Harmonious Color Palette Classes */
+.web-background {
+  background: #E0F7FA;
+}
+
+.web-primary-accent {
+  background: #FDC5DC;
+}
+
+.web-secondary-accent {
+  background: #C8E6C9;
+}
+
+.web-neutral-cards {
+  background: #FFFFFF;
+}
+
+.web-main-text {
+  color: #424242;
+}
+
+.web-sub-text {
+  color: #757575;
+}
+
+.web-soft-blue-border {
+  border: 1px solid rgba(179, 235, 242, 0.5);
+} 

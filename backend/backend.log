@@ -1,0 +1,8 @@
+
+> backend@1.0.0 dev
+> ts-node-dev app.ts
+
+[INFO] 20:07:16 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.8.3)
+[dotenv@17.2.0] injecting env (1) from .env (tip: 🔐 encrypt with dotenvx: https://dotenvx.com)
+[dotenv@17.2.0] injecting env (0) from .env (tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild)
+Backend running on http://localhost:5050

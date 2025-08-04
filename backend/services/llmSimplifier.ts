@@ -54,49 +54,80 @@ export async function simplifyMedicineInfo(
     let prompt: string;
     
     if (model === 'regular') {
-      // Detailed model - comprehensive information
-      prompt = `You are a medical information assistant. Please provide comprehensive, detailed information about this medication in a clear, organized format. Include all important details from the FDA data.
-
-Drug Information:
-- Name: ${rawInfo.name}
-- RxCUI: ${rawInfo.rxcui || 'Not available'}
-- Uses: ${rawInfo.uses || 'Not available'}
-- Dosage: ${rawInfo.dosage || 'Not available'}
-- Warnings: ${rawInfo.warnings || 'Not available'}
-- Side Effects: ${rawInfo.sideEffects || 'Not available'}
+      // Detailed model - comprehensive information for healthcare professionals
+      prompt = `You are a medical information assistant. Provide comprehensive, detailed information about "${rawInfo.name}" medication. This is for healthcare professionals or detailed research.
 
 Please provide a comprehensive overview including:
-1. What this medication is and how it works
-2. What conditions it treats
-3. How to take it (dosage, timing, administration)
-4. Important warnings and precautions
-5. Common and serious side effects
-6. Drug interactions to be aware of
-7. What to do if you miss a dose
-8. When to contact a healthcare provider
 
-Format the response in clear sections with headings.`;
+**What is ${rawInfo.name}?**
+- Drug class and mechanism of action
+- How it works in the body
+- What conditions it treats
+
+**Dosage Information:**
+- Standard dosages for different conditions
+- Timing and administration instructions
+- Special considerations (age, weight, kidney function)
+- Maximum daily limits
+
+**Important Warnings & Precautions:**
+- Contraindications (when NOT to use)
+- Drug interactions
+- Special populations (pregnancy, breastfeeding, elderly)
+- Pre-existing conditions to consider
+
+**Side Effects:**
+- Common side effects and their frequency
+- Serious side effects and warning signs
+- What to do if side effects occur
+- When to seek immediate medical attention
+
+**Drug Interactions:**
+- Medications that should not be taken together
+- Food interactions
+- Alcohol and other substances
+
+**Monitoring & Follow-up:**
+- What to monitor while taking this medication
+- When to contact healthcare provider
+- Signs of overdose or adverse reactions
+
+Format the response in clear sections with headings. Include specific medical terminology and detailed information.`;
     } else {
-      // Simplified model - user-friendly, easy to understand
-      prompt = `You are a medical information assistant. Please provide simple, easy-to-understand information about this medication in a user-friendly format. Focus on the most important information that patients need to know.
-
-Drug Information:
-- Name: ${rawInfo.name}
-- Uses: ${rawInfo.uses || 'Not available'}
-- Dosage: ${rawInfo.dosage || 'Not available'}
-- Warnings: ${rawInfo.warnings || 'Not available'}
-- Side Effects: ${rawInfo.sideEffects || 'Not available'}
+      // Simplified model - key info for busy people
+      prompt = `You are a medical information assistant. Provide simple, easy-to-understand information about "${rawInfo.name}" medication. This is for people with limited time who need key information quickly.
 
 Please provide simplified information including:
-1. What this medication is for
-2. How to take it (simple instructions)
-3. Important tips and warnings
-4. Common side effects
-5. When to call a doctor
 
-Use simple language that anyone can understand. Avoid medical jargon.`;
+**What is ${rawInfo.name} for?**
+- Simple explanation of what it treats
+- How it helps (in plain language)
+
+**How to take it:**
+- Simple dosage instructions
+- When to take it
+- Basic tips (with food, etc.)
+
+**Important warnings:**
+- Key things to avoid
+- When to call a doctor
+- Emergency signs to watch for
+
+**Common side effects:**
+- Most likely side effects
+- What to do if they happen
+
+**Quick tips:**
+- 2-3 important things to remember
+- When to seek medical help
+
+Use simple, everyday language. Avoid medical jargon. Focus on what patients need to know quickly. Keep it concise but helpful.`;
     }
 
+    console.log('Making OpenRouter API call with model:', modelId);
+    console.log('API Key exists:', !!OPENROUTER_API_KEY);
+    console.log('API Key starts with:', OPENROUTER_API_KEY?.substring(0, 10) + '...');
+    
     const response = await fetch(OPENROUTER_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -117,9 +148,14 @@ Use simple language that anyone can understand. Avoid medical jargon.`;
         temperature: 0.3,
       })
     });
+    
+    console.log('OpenRouter response status:', response.status);
+    console.log('OpenRouter response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const error = await response.text();
+      console.error('OpenRouter API error response:', error);
+      console.error('OpenRouter API error status:', response.status);
       throw new Error(`OpenRouter error: ${response.status} ${error}`);
     }
 
